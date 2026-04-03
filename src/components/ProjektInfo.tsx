@@ -1,5 +1,5 @@
 'use client'
-import { Projekt, Foerderstelle } from '@/lib/types'
+import { Projekt, Foerderstelle, FOERDERSTELLEN_SUBKATEGORIEN } from '@/lib/types'
 
 const FOERDERSTELLEN: Foerderstelle[] = ['FFG', 'AWS', 'SFG', 'WAW']
 const FOERDERARTEN = ['', 'Einzelprojekt', 'Kooperationsprojekt', 'Innovationsscheck', 'Leitprojekt', 'Feasibility Study']
@@ -19,10 +19,21 @@ export default function ProjektInfo({ projekt, onChange, onDelete }: Props) {
     onChange({ ...projekt, [field]: value, updatedAt: new Date().toISOString() })
   }
   function toggleFoerder(f: Foerderstelle) {
-    const next = projekt.foerderstellen.includes(f)
+    const isSelected = projekt.foerderstellen.includes(f)
+    const nextStellen = isSelected
       ? projekt.foerderstellen.filter(x => x !== f)
       : [...projekt.foerderstellen, f]
-    update('foerderstellen', next)
+    const nextSub = { ...projekt.foerderstellenSubkategorien }
+    if (isSelected) delete nextSub[f]
+    const updated = { ...projekt, foerderstellen: nextStellen, foerderstellenSubkategorien: nextSub, updatedAt: new Date().toISOString() }
+    onChange(updated)
+  }
+
+  function toggleSubkategorie(stelle: Foerderstelle, sub: string) {
+    const current = projekt.foerderstellenSubkategorien[stelle] ?? []
+    const next = current.includes(sub) ? current.filter(s => s !== sub) : [...current, sub]
+    const nextSub = { ...projekt.foerderstellenSubkategorien, [stelle]: next }
+    update('foerderstellenSubkategorien', nextSub)
   }
 
   return (
@@ -51,12 +62,28 @@ export default function ProjektInfo({ projekt, onChange, onDelete }: Props) {
       </div>
       <div style={group}>
         <label style={label}>Foerderstellen</label>
-        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', marginTop: 4 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
           {FOERDERSTELLEN.map(f => (
-            <label key={f} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 14, cursor: 'pointer' }}>
-              <input type="checkbox" checked={projekt.foerderstellen.includes(f)} onChange={() => toggleFoerder(f)} />
-              {f}
-            </label>
+            <div key={f}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 14, cursor: 'pointer' }}>
+                <input type="checkbox" checked={projekt.foerderstellen.includes(f)} onChange={() => toggleFoerder(f)} />
+                {f}
+              </label>
+              {projekt.foerderstellen.includes(f) && FOERDERSTELLEN_SUBKATEGORIEN[f] && (
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 6, marginLeft: 22 }}>
+                  {FOERDERSTELLEN_SUBKATEGORIEN[f]!.map(sub => (
+                    <label key={sub} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', color: 'var(--text2)' }}>
+                      <input
+                        type="checkbox"
+                        checked={(projekt.foerderstellenSubkategorien[f] ?? []).includes(sub)}
+                        onChange={() => toggleSubkategorie(f, sub)}
+                      />
+                      {sub}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
         </div>
       </div>

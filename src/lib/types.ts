@@ -1,5 +1,10 @@
 export type Foerderstelle = 'FFG' | 'AWS' | 'SFG' | 'WAW'
 
+export const FOERDERSTELLEN_SUBKATEGORIEN: Partial<Record<Foerderstelle, string[]>> = {
+  FFG: ['Kleinprojekt', 'Basisprogramm'],
+  AWS: ['Pre-Seed', 'Seed'],
+}
+
 export interface TaskResult {
   status: 'idle' | 'running' | 'done' | 'error'
   output?: string
@@ -19,6 +24,7 @@ export interface Projekt {
   branche: string
   foerderart: string
   foerderstellen: Foerderstelle[]
+  foerderstellenSubkategorien: Partial<Record<Foerderstelle, string[]>>
   notizen: string
   innovation: string
   zielmarkt: string

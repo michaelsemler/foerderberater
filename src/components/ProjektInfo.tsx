@@ -23,16 +23,16 @@ export default function ProjektInfo({ projekt, onChange, onDelete }: Props) {
     const nextStellen = isSelected
       ? projekt.foerderstellen.filter(x => x !== f)
       : [...projekt.foerderstellen, f]
-    const nextSub = { ...projekt.foerderstellenSubkategorien }
+    const nextSub = { ...(projekt.foerderstellenSubkategorien ?? {}) }
     if (isSelected) delete nextSub[f]
     const updated = { ...projekt, foerderstellen: nextStellen, foerderstellenSubkategorien: nextSub, updatedAt: new Date().toISOString() }
     onChange(updated)
   }
 
   function toggleSubkategorie(stelle: Foerderstelle, sub: string) {
-    const current = projekt.foerderstellenSubkategorien[stelle] ?? []
+    const current = (projekt.foerderstellenSubkategorien ?? {})[stelle] ?? []
     const next = current.includes(sub) ? current.filter(s => s !== sub) : [...current, sub]
-    const nextSub = { ...projekt.foerderstellenSubkategorien, [stelle]: next }
+    const nextSub = { ...(projekt.foerderstellenSubkategorien ?? {}), [stelle]: next }
     update('foerderstellenSubkategorien', nextSub)
   }
 
@@ -75,7 +75,7 @@ export default function ProjektInfo({ projekt, onChange, onDelete }: Props) {
                     <label key={sub} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', color: 'var(--text2)' }}>
                       <input
                         type="checkbox"
-                        checked={(projekt.foerderstellenSubkategorien[f] ?? []).includes(sub)}
+                        checked={((projekt.foerderstellenSubkategorien ?? {})[f] ?? []).includes(sub)}
                         onChange={() => toggleSubkategorie(f, sub)}
                       />
                       {sub}

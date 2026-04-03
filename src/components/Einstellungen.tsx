@@ -113,18 +113,30 @@ export default function Einstellungen({ settings, onChange }: Props) {
         body: JSON.stringify({ task: 'fragen_extrahieren', text: currentSub.businessplanText }),
       })
       const data = await res.json()
+      if (data.error) throw new Error(data.error)
       if (data.text) {
-        const extracted: { frage: string }[] = JSON.parse(data.text)
-        const newFragen: FrageTemplate[] = extracted.map(e => ({
-          id: 'frage_' + Date.now() + '_' + Math.random().toString(36).slice(2),
-          frage: e.frage,
-          prompt: '',
-          schablone: '',
-        }))
+        // Robust JSON extraction: handle markdown code blocks
+        let jsonText = data.text.trim()
+        const match = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/)
+        if (match) jsonText = match[1].trim()
+        const arrayMatch = jsonText.match(/\[[\s\S]*\]/)
+        if (arrayMatch) jsonText = arrayMatch[0]
+
+        const extracted: { frage: string }[] = JSON.parse(jsonText)
+        const ts = Date.now()
+        const newFragen: FrageTemplate[] = extracted
+          .filter(e => e.frage?.trim())
+          .map((e, i) => ({
+            id: `frage_${ts}_${i}`,
+            frage: e.frage.trim(),
+            prompt: '',
+            schablone: '',
+          }))
+        if (newFragen.length === 0) throw new Error('Keine Fragen gefunden')
         updateSettings(selectedStelle, { ...currentSub, fragen: [...currentSub.fragen, ...newFragen] })
       }
-    } catch {
-      setExtractError('Fehler beim Extrahieren. Bitte erneut versuchen.')
+    } catch (err) {
+      setExtractError(err instanceof Error ? err.message : 'Fehler beim Extrahieren. Bitte erneut versuchen.')
     } finally {
       setExtracting(false)
     }

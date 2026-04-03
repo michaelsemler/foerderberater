@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { Projekt, Foerderstelle } from '@/lib/types'
+import { Projekt, Foerderstelle, FOERDERSTELLEN_SUBKATEGORIEN } from '@/lib/types'
 import { loadProjekte, saveProjekt, deleteProjekt, newProjekt } from '@/lib/storage'
 import ProjektInfo from './ProjektInfo'
 import KITasks from './KITasks'
@@ -20,6 +20,7 @@ export default function FoerderberaterApp() {
   const [newName, setNewName] = useState('')
   const [newCompany, setNewCompany] = useState('')
   const [newFoerder, setNewFoerder] = useState<Foerderstelle[]>([])
+  const [newSubkategorien, setNewSubkategorien] = useState<Partial<Record<Foerderstelle, string[]>>>({})
 
   useEffect(() => {
     const data = loadProjekte()
@@ -36,7 +37,7 @@ export default function FoerderberaterApp() {
 
   function handleCreate() {
     if (!newName.trim()) return
-    const p = newProjekt({ name: newName.trim(), company: newCompany.trim(), foerderstellen: newFoerder })
+    const p = newProjekt({ name: newName.trim(), company: newCompany.trim(), foerderstellen: newFoerder, foerderstellenSubkategorien: newSubkategorien })
     setProjekte(prev => [...prev, p])
     saveProjekt(p)
     setActiveId(p.id)
@@ -45,6 +46,7 @@ export default function FoerderberaterApp() {
     setNewName('')
     setNewCompany('')
     setNewFoerder([])
+    setNewSubkategorien({})
   }
 
   function handleDelete(id: string) {
@@ -58,7 +60,21 @@ export default function FoerderberaterApp() {
   }
 
   function toggleFoerder(f: Foerderstelle) {
-    setNewFoerder(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f])
+    setNewFoerder(prev => {
+      const isSelected = prev.includes(f)
+      if (isSelected) {
+        setNewSubkategorien(s => { const next = { ...s }; delete next[f]; return next })
+      }
+      return isSelected ? prev.filter(x => x !== f) : [...prev, f]
+    })
+  }
+
+  function toggleModalSubkategorie(stelle: Foerderstelle, sub: string) {
+    setNewSubkategorien(prev => {
+      const current = prev[stelle] ?? []
+      const next = current.includes(sub) ? current.filter(s => s !== sub) : [...current, sub]
+      return { ...prev, [stelle]: next }
+    })
   }
 
   return (
@@ -73,7 +89,12 @@ export default function FoerderberaterApp() {
             <button key={p.id} onClick={() => { setActiveId(p.id); setTab('info') }}
               style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 12px', borderRadius: 'var(--radius)', border: p.id === activeId ? '0.5px solid var(--border2)' : '0.5px solid transparent', background: p.id === activeId ? 'var(--bg)' : 'transparent', color: 'var(--text)', cursor: 'pointer', marginBottom: 2 }}>
               <span style={{ display: 'block', fontSize: 14, fontWeight: 500 }}>{p.name}</span>
-              <span style={{ display: 'block', fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>{p.company || '—'} · {p.foerderstellen.join(', ') || 'keine'}</span>
+              <span style={{ display: 'block', fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>
+                {p.company || '—'} · {p.foerderstellen.map(f => {
+                  const subs = p.foerderstellenSubkategorien?.[f] ?? []
+                  return subs.length > 0 ? `${f} (${subs.join(', ')})` : f
+                }).join(', ') || 'keine'}
+              </span>
             </button>
           ))}
         </nav>
@@ -95,10 +116,15 @@ export default function FoerderberaterApp() {
             <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 24px', borderBottom: '0.5px solid var(--border)', gap: 16, flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                 <h1 style={{ fontSize: 17, fontWeight: 500 }}>{aktiv.name}</h1>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {aktiv.foerderstellen.map(f => (
-                    <span key={f} className={'badge ' + BADGE[f]}>{f}</span>
-                  ))}
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {aktiv.foerderstellen.map(f => {
+                    const subs = aktiv.foerderstellenSubkategorien?.[f] ?? []
+                    return (
+                      <span key={f} className={'badge ' + BADGE[f]}>
+                        {f}{subs.length > 0 ? ` · ${subs.join(', ')}` : ''}
+                      </span>
+                    )
+                  })}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 2, background: 'var(--bg2)', padding: 3, borderRadius: 'var(--radius)', border: '0.5px solid var(--border)' }}>
@@ -134,12 +160,28 @@ export default function FoerderberaterApp() {
             </div>
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: 'var(--text2)', marginBottom: 6 }}>Foerderstellen</label>
-              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {FOERDERSTELLEN.map(f => (
-                  <label key={f} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 14, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={newFoerder.includes(f)} onChange={() => toggleFoerder(f)} />
-                    {f}
-                  </label>
+                  <div key={f}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 14, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={newFoerder.includes(f)} onChange={() => toggleFoerder(f)} />
+                      {f}
+                    </label>
+                    {newFoerder.includes(f) && FOERDERSTELLEN_SUBKATEGORIEN[f] && (
+                      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 5, marginLeft: 22 }}>
+                        {FOERDERSTELLEN_SUBKATEGORIEN[f]!.map(sub => (
+                          <label key={sub} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', color: 'var(--text2)' }}>
+                            <input
+                              type="checkbox"
+                              checked={(newSubkategorien[f] ?? []).includes(sub)}
+                              onChange={() => toggleModalSubkategorie(f, sub)}
+                            />
+                            {sub}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>

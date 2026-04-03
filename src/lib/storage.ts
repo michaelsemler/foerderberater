@@ -38,6 +38,7 @@ export function newProjekt(partial: Partial<Projekt>): Projekt {
     branche: '',
     foerderart: '',
     foerderstellen: [],
+    foerderstellenSubkategorien: {},
     notizen: '',
     innovation: '',
     zielmarkt: '',

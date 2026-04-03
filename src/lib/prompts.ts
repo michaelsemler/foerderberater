@@ -17,5 +17,5 @@ export function getValidatorPrompt(p: Projekt, outputs: string): string {
 }
 
 export function getFragenExtraktionPrompt(text: string): string {
-  return 'Du bist ein Experte fuer oesterreichische Foerderantraege.\n\nAnalysiere folgenden Text und extrahiere alle Fragen oder Abschnitte, die in einem Foerderantrag beantwortet werden muessen.\n\nAntworte NUR als JSON-Array (kein Markdown, kein Text davor oder danach):\n[{"frage": "..."}, {"frage": "..."}, ...]\n\nText:\n' + text
+  return 'Du bist ein Experte fuer oesterreichische Foerderantraege.\n\nAnalysiere folgenden Text und extrahiere alle Fragen oder Abschnitte, die in einem Foerderantrag beantwortet werden muessen.\n\nWICHTIGES AUSGABEFORMAT:\n- Gib NUR Zeilen im Format "FRAGE: <Text>" aus\n- Genau eine Frage pro Zeile\n- Kein JSON\n- Kein Markdown\n- Keine Einleitung/Erklaerung\n\nText:\n' + text
 }

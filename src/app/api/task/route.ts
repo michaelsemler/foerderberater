@@ -20,9 +20,11 @@ export async function POST(req: NextRequest) {
     else if (task === 'validator') prompt = getValidatorPrompt(projekt, outputs || '')
     else if (task === 'fragen_extrahieren') prompt = getFragenExtraktionPrompt(text || '')
 
+    const maxTokens = task === 'fragen_extrahieren' ? 4000 : 1500
+
     const message = await client.messages.create({
       model: 'claude-opus-4-5',
-      max_tokens: 1500,
+      max_tokens: maxTokens,
       messages: [{ role: 'user', content: prompt }],
     })
 

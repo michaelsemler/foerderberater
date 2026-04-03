@@ -115,20 +115,13 @@ export default function Einstellungen({ settings, onChange }: Props) {
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       if (data.text) {
-        // Robust JSON extraction: handle markdown code blocks
-        let jsonText = data.text.trim()
-        const match = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/)
-        if (match) jsonText = match[1].trim()
-        const arrayMatch = jsonText.match(/\[[\s\S]*\]/)
-        if (arrayMatch) jsonText = arrayMatch[0]
-
-        const extracted: { frage: string }[] = JSON.parse(jsonText)
+        const extracted = parseExtractedQuestions(data.text)
         const ts = Date.now()
         const newFragen: FrageTemplate[] = extracted
-          .filter(e => e.frage?.trim())
-          .map((e, i) => ({
+          .filter(frage => frage.trim())
+          .map((frage, i) => ({
             id: `frage_${ts}_${i}`,
-            frage: e.frage.trim(),
+            frage: frage.trim(),
             prompt: '',
             schablone: '',
           }))
@@ -140,6 +133,58 @@ export default function Einstellungen({ settings, onChange }: Props) {
     } finally {
       setExtracting(false)
     }
+  }
+
+  function parseExtractedQuestions(raw: string): string[] {
+    const text = raw.trim()
+
+    // 1) Preferred format: FRAGE: ...
+    const frageLines = text
+      .split('\n')
+      .map(line => line.trim())
+      .filter(Boolean)
+      .filter(line => /^frage\s*:/i.test(line))
+      .map(line => line.replace(/^frage\s*:\s*/i, '').trim())
+      .filter(Boolean)
+    if (frageLines.length > 0) return dedupeQuestions(frageLines)
+
+    // 2) Backward compatibility: JSON output
+    try {
+      let jsonText = text
+      const codeBlockMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/i)
+      if (codeBlockMatch) jsonText = codeBlockMatch[1].trim()
+      const arrayMatch = jsonText.match(/\[[\s\S]*\]/)
+      if (arrayMatch) jsonText = arrayMatch[0]
+      const parsed = JSON.parse(jsonText) as { frage?: string }[]
+      const jsonQuestions = parsed.map(e => e.frage?.trim() || '').filter(Boolean)
+      if (jsonQuestions.length > 0) return dedupeQuestions(jsonQuestions)
+    } catch {
+      // continue with heuristic fallback below
+    }
+
+    // 3) Heuristic fallback: numbered or bullet lines
+    const fallback = text
+      .split('\n')
+      .map(line => line.trim())
+      .filter(Boolean)
+      .map(line => line.replace(/^[-*•]\s+/, ''))
+      .map(line => line.replace(/^\d+[.)]\s+/, ''))
+      .filter(line => line.length > 10)
+    return dedupeQuestions(fallback)
+  }
+
+  function dedupeQuestions(values: string[]): string[] {
+    const seen = new Set<string>()
+    const result: string[] = []
+    for (const value of values) {
+      const normalized = value.replace(/\s+/g, ' ').trim()
+      if (!normalized) continue
+      const key = normalized.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      result.push(normalized)
+    }
+    return result
   }
 
   return (

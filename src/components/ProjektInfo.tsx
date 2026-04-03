@@ -1,11 +1,11 @@
 'use client'
-import { Projekt, Foerderstelle, FOERDERSTELLEN_SUBKATEGORIEN } from '@/lib/types'
+import { Projekt, Foerderstelle, AppSettings } from '@/lib/types'
 
 const FOERDERSTELLEN: Foerderstelle[] = ['FFG', 'AWS', 'SFG', 'WAW']
-const FOERDERARTEN = ['', 'Einzelprojekt', 'Kooperationsprojekt', 'Innovationsscheck', 'Leitprojekt', 'Feasibility Study']
 
 interface Props {
   projekt: Projekt
+  settings: AppSettings
   onChange: (p: Projekt) => void
   onDelete: () => void
 }
@@ -14,10 +14,15 @@ const label = { display: 'block', fontSize: 13, fontWeight: 500, color: 'var(--t
 const hint = { fontSize: 12, color: 'var(--text3)', marginBottom: 6, lineHeight: 1.5 } as const
 const group = { marginBottom: 20 } as const
 
-export default function ProjektInfo({ projekt, onChange, onDelete }: Props) {
+export default function ProjektInfo({ projekt, settings, onChange, onDelete }: Props) {
   function update(field: keyof Projekt, value: unknown) {
     onChange({ ...projekt, [field]: value, updatedAt: new Date().toISOString() })
   }
+
+  function getSubsForStelle(stelle: Foerderstelle) {
+    return settings.foerderstellen.find(f => f.stelle === stelle)?.subkategorien ?? []
+  }
+
   function toggleFoerder(f: Foerderstelle) {
     const isSelected = projekt.foerderstellen.includes(f)
     const nextStellen = isSelected
@@ -25,15 +30,13 @@ export default function ProjektInfo({ projekt, onChange, onDelete }: Props) {
       : [...projekt.foerderstellen, f]
     const nextSub = { ...(projekt.foerderstellenSubkategorien ?? {}) }
     if (isSelected) delete nextSub[f]
-    const updated = { ...projekt, foerderstellen: nextStellen, foerderstellenSubkategorien: nextSub, updatedAt: new Date().toISOString() }
-    onChange(updated)
+    onChange({ ...projekt, foerderstellen: nextStellen, foerderstellenSubkategorien: nextSub, updatedAt: new Date().toISOString() })
   }
 
-  function toggleSubkategorie(stelle: Foerderstelle, sub: string) {
+  function toggleSubkategorie(stelle: Foerderstelle, id: string) {
     const current = (projekt.foerderstellenSubkategorien ?? {})[stelle] ?? []
-    const next = current.includes(sub) ? current.filter(s => s !== sub) : [...current, sub]
-    const nextSub = { ...(projekt.foerderstellenSubkategorien ?? {}), [stelle]: next }
-    update('foerderstellenSubkategorien', nextSub)
+    const next = current.includes(id) ? current.filter(s => s !== id) : [...current, id]
+    update('foerderstellenSubkategorien', { ...(projekt.foerderstellenSubkategorien ?? {}), [stelle]: next })
   }
 
   return (
@@ -48,43 +51,38 @@ export default function ProjektInfo({ projekt, onChange, onDelete }: Props) {
           <input type="text" value={projekt.company} onChange={e => update('company', e.target.value)} />
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
-        <div style={group}>
-          <label style={label}>Branche / Technologiebereich</label>
-          <input type="text" value={projekt.branche} onChange={e => update('branche', e.target.value)} placeholder="z.B. Medizintechnik, IKT" />
-        </div>
-        <div style={group}>
-          <label style={label}>Foerderart</label>
-          <select value={projekt.foerderart} onChange={e => update('foerderart', e.target.value)}>
-            {FOERDERARTEN.map(f => <option key={f} value={f}>{f || '— bitte waehlen —'}</option>)}
-          </select>
-        </div>
+      <div style={group}>
+        <label style={label}>Branche / Technologiebereich</label>
+        <input type="text" value={projekt.branche} onChange={e => update('branche', e.target.value)} placeholder="z.B. Medizintechnik, IKT" />
       </div>
       <div style={group}>
         <label style={label}>Foerderstellen</label>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
-          {FOERDERSTELLEN.map(f => (
-            <div key={f}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 14, cursor: 'pointer' }}>
-                <input type="checkbox" checked={projekt.foerderstellen.includes(f)} onChange={() => toggleFoerder(f)} />
-                {f}
-              </label>
-              {projekt.foerderstellen.includes(f) && FOERDERSTELLEN_SUBKATEGORIEN[f] && (
-                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 6, marginLeft: 22 }}>
-                  {FOERDERSTELLEN_SUBKATEGORIEN[f]!.map(sub => (
-                    <label key={sub} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', color: 'var(--text2)' }}>
-                      <input
-                        type="checkbox"
-                        checked={((projekt.foerderstellenSubkategorien ?? {})[f] ?? []).includes(sub)}
-                        onChange={() => toggleSubkategorie(f, sub)}
-                      />
-                      {sub}
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
+          {FOERDERSTELLEN.map(f => {
+            const subs = getSubsForStelle(f)
+            return (
+              <div key={f}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 14, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={projekt.foerderstellen.includes(f)} onChange={() => toggleFoerder(f)} />
+                  {f}
+                </label>
+                {projekt.foerderstellen.includes(f) && subs.length > 0 && (
+                  <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 6, marginLeft: 22 }}>
+                    {subs.map(sub => (
+                      <label key={sub.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', color: 'var(--text2)' }}>
+                        <input
+                          type="checkbox"
+                          checked={((projekt.foerderstellenSubkategorien ?? {})[f] ?? []).includes(sub.id)}
+                          onChange={() => toggleSubkategorie(f, sub.id)}
+                        />
+                        {sub.name}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       </div>
       <hr style={{ border: 'none', borderTop: '0.5px solid var(--border)', margin: '8px 0 24px' }} />

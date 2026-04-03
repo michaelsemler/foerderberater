@@ -1,8 +1,29 @@
 export type Foerderstelle = 'FFG' | 'AWS' | 'SFG' | 'WAW'
 
-export const FOERDERSTELLEN_SUBKATEGORIEN: Partial<Record<Foerderstelle, string[]>> = {
-  FFG: ['Kleinprojekt', 'Basisprogramm'],
-  AWS: ['Pre-Seed', 'Seed'],
+export interface FrageTemplate {
+  id: string
+  frage: string
+  prompt: string
+  schablone: string
+}
+
+export interface Subkategorie {
+  id: string
+  name: string
+  richtlinien: string
+  dokumente: string
+  businessplanText: string
+  businessplanUrl?: string
+  fragen: FrageTemplate[]
+}
+
+export interface FoerderstelleConfig {
+  stelle: Foerderstelle
+  subkategorien: Subkategorie[]
+}
+
+export interface AppSettings {
+  foerderstellen: FoerderstelleConfig[]
 }
 
 export interface TaskResult {
@@ -22,7 +43,6 @@ export interface Projekt {
   name: string
   company: string
   branche: string
-  foerderart: string
   foerderstellen: Foerderstelle[]
   foerderstellenSubkategorien: Partial<Record<Foerderstelle, string[]>>
   notizen: string

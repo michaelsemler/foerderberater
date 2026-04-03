@@ -1,10 +1,11 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { Projekt, Foerderstelle, FOERDERSTELLEN_SUBKATEGORIEN } from '@/lib/types'
-import { loadProjekte, saveProjekt, deleteProjekt, newProjekt } from '@/lib/storage'
+import { Projekt, Foerderstelle, AppSettings } from '@/lib/types'
+import { loadProjekte, saveProjekt, deleteProjekt, newProjekt, loadSettings, saveSettings } from '@/lib/storage'
 import ProjektInfo from './ProjektInfo'
 import KITasks from './KITasks'
 import Validator from './Validator'
+import Einstellungen from './Einstellungen'
 
 const FOERDERSTELLEN: Foerderstelle[] = ['FFG', 'AWS', 'SFG', 'WAW']
 
@@ -14,9 +15,11 @@ const BADGE: Record<Foerderstelle, string> = {
 
 export default function FoerderberaterApp() {
   const [projekte, setProjekte] = useState<Projekt[]>([])
+  const [settings, setSettings] = useState<AppSettings>({ foerderstellen: [] })
   const [activeId, setActiveId] = useState<string | null>(null)
   const [tab, setTab] = useState<'info' | 'tasks' | 'validator'>('info')
   const [showModal, setShowModal] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
   const [newName, setNewName] = useState('')
   const [newCompany, setNewCompany] = useState('')
   const [newFoerder, setNewFoerder] = useState<Foerderstelle[]>([])
@@ -24,15 +27,31 @@ export default function FoerderberaterApp() {
 
   useEffect(() => {
     const data = loadProjekte()
+    const s = loadSettings()
     setProjekte(data)
+    setSettings(s)
     if (data.length > 0) setActiveId(data[0].id)
   }, [])
 
   const aktiv = projekte.find(p => p.id === activeId) ?? null
 
+  function getSubName(stelle: Foerderstelle, id: string): string {
+    const config = settings.foerderstellen.find(f => f.stelle === stelle)
+    return config?.subkategorien.find(s => s.id === id)?.name ?? id
+  }
+
+  function getSubsForStelle(stelle: Foerderstelle) {
+    return settings.foerderstellen.find(f => f.stelle === stelle)?.subkategorien ?? []
+  }
+
   function updateProjekt(updated: Projekt) {
     setProjekte(prev => prev.map(p => p.id === updated.id ? updated : p))
     saveProjekt(updated)
+  }
+
+  function updateSettings(updated: AppSettings) {
+    setSettings(updated)
+    saveSettings(updated)
   }
 
   function handleCreate() {
@@ -69,10 +88,10 @@ export default function FoerderberaterApp() {
     })
   }
 
-  function toggleModalSubkategorie(stelle: Foerderstelle, sub: string) {
+  function toggleModalSub(stelle: Foerderstelle, id: string) {
     setNewSubkategorien(prev => {
       const current = prev[stelle] ?? []
-      const next = current.includes(sub) ? current.filter(s => s !== sub) : [...current, sub]
+      const next = current.includes(id) ? current.filter(s => s !== id) : [...current, id]
       return { ...prev, [stelle]: next }
     })
   }
@@ -80,32 +99,47 @@ export default function FoerderberaterApp() {
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       <aside style={{ width: 260, minWidth: 260, display: 'flex', flexDirection: 'column', borderRight: '0.5px solid var(--border)', background: 'var(--bg2)' }}>
-        <div style={{ padding: '18px 16px 14px', borderBottom: '0.5px solid var(--border)' }}>
+        <div style={{ padding: '18px 16px 14px', borderBottom: '0.5px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: '0.02em' }}>Foerderberater Portal</span>
+          <button onClick={() => setShowSettings(v => !v)} title="Einstellungen"
+            style={{ background: showSettings ? 'var(--bg)' : 'transparent', border: showSettings ? '0.5px solid var(--border2)' : 'none', borderRadius: 6, padding: '3px 7px', cursor: 'pointer', fontSize: 14, color: showSettings ? 'var(--text)' : 'var(--text3)' }}>
+            ⚙
+          </button>
         </div>
         <nav style={{ flex: 1, overflowY: 'auto', padding: 8 }}>
-          {projekte.length === 0 && <p style={{ fontSize: 13, color: 'var(--text3)', textAlign: 'center', padding: '24px 8px' }}>Noch keine Projekte</p>}
-          {projekte.map(p => (
+          {projekte.length === 0 && !showSettings && <p style={{ fontSize: 13, color: 'var(--text3)', textAlign: 'center', padding: '24px 8px' }}>Noch keine Projekte</p>}
+          {!showSettings && projekte.map(p => (
             <button key={p.id} onClick={() => { setActiveId(p.id); setTab('info') }}
               style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 12px', borderRadius: 'var(--radius)', border: p.id === activeId ? '0.5px solid var(--border2)' : '0.5px solid transparent', background: p.id === activeId ? 'var(--bg)' : 'transparent', color: 'var(--text)', cursor: 'pointer', marginBottom: 2 }}>
               <span style={{ display: 'block', fontSize: 14, fontWeight: 500 }}>{p.name}</span>
               <span style={{ display: 'block', fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>
                 {p.company || '—'} · {p.foerderstellen.map(f => {
-                  const subs = p.foerderstellenSubkategorien?.[f] ?? []
-                  return subs.length > 0 ? `${f} (${subs.join(', ')})` : f
+                  const subs = (p.foerderstellenSubkategorien ?? {})[f] ?? []
+                  return subs.length > 0 ? `${f} (${subs.map(id => getSubName(f, id)).join(', ')})` : f
                 }).join(', ') || 'keine'}
               </span>
             </button>
           ))}
         </nav>
-        <button onClick={() => setShowModal(true)}
-          style={{ margin: 8, padding: '10px 12px', border: '0.5px dashed var(--border2)', borderRadius: 'var(--radius)', background: 'transparent', color: 'var(--text2)', fontSize: 13, cursor: 'pointer' }}>
-          + Neues Projekt
-        </button>
+        {!showSettings && (
+          <button onClick={() => setShowModal(true)}
+            style={{ margin: 8, padding: '10px 12px', border: '0.5px dashed var(--border2)', borderRadius: 'var(--radius)', background: 'transparent', color: 'var(--text2)', fontSize: 13, cursor: 'pointer' }}>
+            + Neues Projekt
+          </button>
+        )}
       </aside>
 
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        {!aktiv ? (
+        {showSettings ? (
+          <>
+            <header style={{ display: 'flex', alignItems: 'center', padding: '14px 24px', borderBottom: '0.5px solid var(--border)' }}>
+              <h1 style={{ fontSize: 17, fontWeight: 500 }}>Einstellungen</h1>
+            </header>
+            <div style={{ flex: 1, overflow: 'hidden' }}>
+              <Einstellungen settings={settings} onChange={updateSettings} />
+            </div>
+          </>
+        ) : !aktiv ? (
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text2)', textAlign: 'center', padding: 40 }}>
             <h2 style={{ fontSize: 18, fontWeight: 500, color: 'var(--text)', marginBottom: 8 }}>Willkommen im Foerderberater Portal</h2>
             <p style={{ fontSize: 14, marginBottom: 16 }}>Erstelle ein neues Projekt oder waehle eines aus der Liste.</p>
@@ -118,10 +152,10 @@ export default function FoerderberaterApp() {
                 <h1 style={{ fontSize: 17, fontWeight: 500 }}>{aktiv.name}</h1>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {aktiv.foerderstellen.map(f => {
-                    const subs = aktiv.foerderstellenSubkategorien?.[f] ?? []
+                    const subs = (aktiv.foerderstellenSubkategorien ?? {})[f] ?? []
                     return (
                       <span key={f} className={'badge ' + BADGE[f]}>
-                        {f}{subs.length > 0 ? ` · ${subs.join(', ')}` : ''}
+                        {f}{subs.length > 0 ? ` · ${subs.map(id => getSubName(f, id)).join(', ')}` : ''}
                       </span>
                     )
                   })}
@@ -137,7 +171,7 @@ export default function FoerderberaterApp() {
               </div>
             </header>
             <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
-              {tab === 'info' && <ProjektInfo projekt={aktiv} onChange={updateProjekt} onDelete={() => handleDelete(aktiv.id)} />}
+              {tab === 'info' && <ProjektInfo projekt={aktiv} settings={settings} onChange={updateProjekt} onDelete={() => handleDelete(aktiv.id)} />}
               {tab === 'tasks' && <KITasks projekt={aktiv} onChange={updateProjekt} />}
               {tab === 'validator' && <Validator projekt={aktiv} onChange={updateProjekt} />}
             </div>
@@ -161,28 +195,29 @@ export default function FoerderberaterApp() {
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: 'var(--text2)', marginBottom: 6 }}>Foerderstellen</label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {FOERDERSTELLEN.map(f => (
-                  <div key={f}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 14, cursor: 'pointer' }}>
-                      <input type="checkbox" checked={newFoerder.includes(f)} onChange={() => toggleFoerder(f)} />
-                      {f}
-                    </label>
-                    {newFoerder.includes(f) && FOERDERSTELLEN_SUBKATEGORIEN[f] && (
-                      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 5, marginLeft: 22 }}>
-                        {FOERDERSTELLEN_SUBKATEGORIEN[f]!.map(sub => (
-                          <label key={sub} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', color: 'var(--text2)' }}>
-                            <input
-                              type="checkbox"
-                              checked={(newSubkategorien[f] ?? []).includes(sub)}
-                              onChange={() => toggleModalSubkategorie(f, sub)}
-                            />
-                            {sub}
-                          </label>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                {FOERDERSTELLEN.map(f => {
+                  const subs = getSubsForStelle(f)
+                  return (
+                    <div key={f}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 14, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={newFoerder.includes(f)} onChange={() => toggleFoerder(f)} />
+                        {f}
+                      </label>
+                      {newFoerder.includes(f) && subs.length > 0 && (
+                        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 5, marginLeft: 22 }}>
+                          {subs.map(sub => (
+                            <label key={sub.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', color: 'var(--text2)' }}>
+                              <input type="checkbox"
+                                checked={(newSubkategorien[f] ?? []).includes(sub.id)}
+                                onChange={() => toggleModalSub(f, sub.id)} />
+                              {sub.name}
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 24 }}>
